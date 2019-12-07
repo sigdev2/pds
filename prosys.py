@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-r''' Copyright 2018, SigDev
+r''' Copyright 2020, SigDev
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,17 +18,40 @@ r''' Copyright 2018, SigDev
 import os
 import shutil
 import six
+import mimetypes
 from zipfile import ZipFile
 from optparse import OptionParser
 
 try:
     # Python 2.6-2.7 
     from urllib2 import urlopen
+    import string
+    def translate(s, t):
+        return s.translate(string.maketrans(r'', r''), t)
 except ImportError:
     # Python 3
     from urllib.request import urlopen
+    def translate(s, t):
+        return s.translate(t)
 
 # utils
+
+def is_text_file(filename):
+    if not(os.path.exists(filename)):
+        return False
+
+    mime_type = mimetypes.guess_type(filename)[0]
+    if not(mime_type is None):
+        return mime_type.startswith(r'text')
+
+    s = open(filename).read(512)
+    text_characters = r''.join(map(chr, range(32, 127))) + '\n\r\t\b'
+    if not s:
+        return True
+    if '\0' in s:
+        return False
+    t = translate(s, text_characters)
+    return float(len(t))/float(len(s)) >= 0.70
 
 def file_get_contents(filename):
     if not(os.path.exists(filename)):
@@ -40,7 +63,7 @@ def file_write_contents(filename, content, mode = r'w'):
     with open(filename, mode) as f:
         f.write(content)
 
-def structToProj(src, target):
+def structToProj(src, target, macros):
     for root, dirs, files in os.walk(src):
         for d in dirs:
             path = target + root.replace(src, r'') + os.sep + d
@@ -50,6 +73,12 @@ def structToProj(src, target):
             path = target + root.replace(src, r'') + os.sep + f
             if not(os.path.exists(path)):
                 shutil.copyfile(root + os.sep + f, path)
+            if macros:
+                if is_text_file(path):
+                    c = file_get_contents(path)
+                    for macro in macros:
+                        c = c.replace(macro, macros[macro])
+                    file_write_contents(path, c)
 
 # consts
 
@@ -62,78 +91,104 @@ CUR_TPL_VERSION_FILE = r'./' + TPL_VERSION_FILE
 CUR_TPL_ARCHIVE = r'./' + TPL_ARCHIVE
 CUR_TPL_FOLDER = r'./' + TPL_FOLDER
 
-# parse args
+MACROSES = [r'%%=PROJ_NAME%%', r'%%=PROJ_PATH%%']
 
-parser = OptionParser(usage=r'usage: %prog [options] module1 module2')
-parser.add_option(r'-o', r'--out', dest=r'proj', help=r'create or check project in DIRNAME', metavar=r'DIRNAME')
-parser.add_option(r'-l', r'--list', action=r'store_true', dest=r'showlist', help=r'show modules list', default=False)
+if __name__ == r'__main__':
 
-(opts, args) = parser.parse_args()
+    # parse args
 
-# check updates templates
+    parser = OptionParser(usage=r'usage: %prog [options] module1 module2')
+    parser.add_option(r'-o', r'--out', dest=r'proj', help=r'create or check project in DIRNAME', metavar=r'DIRNAME')
+    parser.add_option(r'-l', r'--list', action=r'store_true', dest=r'showlist', help=r'show modules list', default=False)
+    parser.add_option(r'-m', r'--macroses', action=r'store_true', dest=r'showmacroses', help=r'show list or macroses to replace in files', default=False)
+    parser.add_option(r'-r', r'--replace', action=r'store_true', dest=r'replace', help=r'replace macroses in copyed template files', default=False)
 
-server_tpl_version = 0
-for line in urlopen(SERVER_URL + TPL_VERSION_FILE):
-    server_tpl_version = int(line)
+    (opts, args) = parser.parse_args()
 
-current_tpl_version = file_get_contents(CUR_TPL_VERSION_FILE)
-if current_tpl_version == False or not(os.path.exists(CUR_TPL_FOLDER)):
-    current_tpl_version = 0
-else:
-    current_tpl_version = int(current_tpl_version)
+    # list of macroses
 
-if server_tpl_version == 0 and not(os.path.exists(CUR_TPL_FOLDER)):
-    six.print_(r'ERROR: Current and remote versions of templates is broken. Can not restore template version!')
-    exit()
+    if opts.showmacroses:
+        six.print_('\nList of macroses to replace in templates: \n')
+        for m in MACROSES:
+            six.print_(m)
+        six.print_('\n')
+        os._exit(1)
 
-if server_tpl_version > current_tpl_version:
-    six.print_(r'Update templates ...')
-    try:
-        file_write_contents(CUR_TPL_VERSION_FILE, str(server_tpl_version))
-        filedata = urlopen(SERVER_URL + TPL_ARCHIVE)
-        datatowrite = filedata.read()
-        file_write_contents(CUR_TPL_ARCHIVE, datatowrite, r'bw')
-        if os.path.exists(CUR_TPL_FOLDER):
-            shutil.rmtree(CUR_TPL_FOLDER)
-        with ZipFile(CUR_TPL_ARCHIVE, r'r') as zipObj:
-            zipObj.extractall()
-        six.print_(r'Templates update successfully!')
-    except Exception:
-        six.print_(r'ERROR: Can not update templates! Try skip update ...')
-        if not(os.path.exists(CUR_TPL_FOLDER)):
-            six.print_(r'ERROR: Templates is not exists!')
-            exit()
+    # check updates templates
 
-# list of templates
+    server_tpl_version = 0
+    for line in urlopen(SERVER_URL + TPL_VERSION_FILE):
+        server_tpl_version = int(line)
 
-if opts.showlist:
-    six.print_('\nList of available templates: \n')
-    six.print_('    Name:\tVersion:\n')
+    current_tpl_version = file_get_contents(CUR_TPL_VERSION_FILE)
+    if current_tpl_version == False or not(os.path.exists(CUR_TPL_FOLDER)):
+        current_tpl_version = 0
+    else:
+        current_tpl_version = int(current_tpl_version)
+
+    if server_tpl_version == 0 and not(os.path.exists(CUR_TPL_FOLDER)):
+        six.print_(r'ERROR: Current and remote versions of templates is broken. Can not restore template version!')
+        os._exit(1)
+
+    updated = False
+    if server_tpl_version > current_tpl_version:
+        six.print_(r'Update templates ...')
+        try:
+            file_write_contents(CUR_TPL_VERSION_FILE, str(server_tpl_version))
+            filedata = urlopen(SERVER_URL + TPL_ARCHIVE)
+            datatowrite = filedata.read()
+            file_write_contents(CUR_TPL_ARCHIVE, datatowrite, r'bw')
+            if os.path.exists(CUR_TPL_FOLDER):
+                shutil.rmtree(CUR_TPL_FOLDER)
+            with ZipFile(CUR_TPL_ARCHIVE, r'r') as zipObj:
+                zipObj.extractall()
+            six.print_(r'Templates update successfully!')
+            updated = True
+        except Exception:
+            six.print_(r'ERROR: Can not update templates! Try skip update ...')
+            if not(os.path.exists(CUR_TPL_FOLDER)):
+                six.print_(r'ERROR: Templates is not exists!')
+                os._exit(1)
+
+    # list of templates
+
+    if opts.showlist or updated:
+        six.print_('\nList of available templates: \n')
+        six.print_('    Name:\tVersion:\n')
+        for dirname in os.listdir(CUR_TPL_FOLDER):
+            six.print_(r'    ' + dirname.replace(r'_ver=', '\t'))
+        six.print_('\n')
+        if opts.showlist:
+            os._exit(1)
+
+    # applay proj path
+
+    if not opts.proj:
+        six.print_(r'ERROR: Specify the path to the project!')
+        os._exit(1)
+
+    projPath = os.path.abspath(opts.proj)
+    if not(projPath[-1] == os.sep):
+        projPath += os.sep
+
+    if not(os.path.exists(projPath)):
+        os.makedirs(projPath)
+        six.print_(r'Projcet directory created !')
+
+    # collect macros
+
+    macros = {}
+
+    if opts.replace:
+        macros = dict(zip(MACROSES, [os.path.basename(os.path.dirname(projPath)), projPath]))
+
+    # integrate modules
+
     for dirname in os.listdir(CUR_TPL_FOLDER):
-        six.print_(r'    ' + dirname.replace(r'_ver=', '\t'))
-    six.print_('\n')
-    exit()
+        name = dirname.split(r'_ver=')[0]
+        if name in args:
+            six.print_(r'use ' + name)
+            structToProj(CUR_TPL_FOLDER + dirname, projPath, macros)
 
-# applay proj path
-
-if not opts.proj:
-    six.print_(r'ERROR: Specify the path to the project!')
-    exit()
-
-projPath = os.path.abspath(opts.proj)
-if not(projPath[-1] == os.sep):
-    projPath += os.sep
-
-if not(os.path.exists(projPath)):
-    os.makedirs(projPath)
-    six.print_(r'Projcet directory created !')
-
-# integrate modules
-
-for dirname in os.listdir(CUR_TPL_FOLDER):
-    name = dirname.split(r'_ver=')[0]
-    if name in args:
-        six.print_(r'use ' + name)
-        structToProj(CUR_TPL_FOLDER + dirname, projPath)
-
-six.print_(r'Sucess!')
+    # success
+    six.print_(r'Success!')
