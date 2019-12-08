@@ -23,18 +23,54 @@ from zipfile import ZipFile
 from optparse import OptionParser
 
 try:
-    # Python 2.6-2.7 
+    # Python 2.6-2.7
     from urllib2 import urlopen
     import string
+
     def translate(s, t):
         return s.translate(string.maketrans(r'', r''), t)
 except ImportError:
     # Python 3
     from urllib.request import urlopen
+
     def translate(s, t):
         return s.translate(t)
 
 # utils
+
+
+def printProgressBar(message, total, pos,
+                     decimals=1, length=100, fill=r'█', printEnd='\r'):
+    value = 100 * (pos / float(total))
+    percent = (r'{0:.' + str(decimals) + r'f}').format(value)
+    filledLength = int(length * pos // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    six.print_('\r %s |%s| %s%%' % (message, bar, percent), end=printEnd)
+    if pos >= total:
+        six.print_()
+
+
+def downloadProgress(file, bytes_red, total_size):
+    printProgressBar(r'Download ' + file, total_size, bytes_red)
+
+
+def chunkedDownload(file, response, chunk_size=8192):
+    total_size = response.getheader(r'Content-Length').strip()
+    total_size = int(total_size)
+    bytes_red = 0
+    data = None
+    while 1:
+        chunk = response.read(chunk_size)
+        if not chunk:
+            break
+        if data is None:
+            data = chunk
+        else:
+            data += chunk
+        bytes_red += len(chunk)
+        downloadProgress(file, bytes_red, total_size)
+    return data
+
 
 def is_text_file(filename):
     if not(os.path.exists(filename)):
@@ -53,15 +89,18 @@ def is_text_file(filename):
     t = translate(s, text_characters)
     return float(len(t))/float(len(s)) >= 0.70
 
+
 def file_get_contents(filename):
     if not(os.path.exists(filename)):
         return False
     with open(filename, r'r') as f:
         return f.read()
 
-def file_write_contents(filename, content, mode = r'w'):
+
+def file_write_contents(filename, content, mode=r'w'):
     with open(filename, mode) as f:
         f.write(content)
+
 
 def structToProj(src, target, macros):
     for root, dirs, files in os.walk(src):
@@ -82,6 +121,7 @@ def structToProj(src, target, macros):
 
 # consts
 
+
 SERVER_URL = r'https://raw.githubusercontent.com/sigdev2/prosys/master/'
 TPL_VERSION_FILE = r'TEMPLATES_VERSION'
 TPL_ARCHIVE = r'templates.zip'
@@ -91,6 +131,8 @@ CUR_TPL_VERSION_FILE = r'./' + TPL_VERSION_FILE
 CUR_TPL_ARCHIVE = r'./' + TPL_ARCHIVE
 CUR_TPL_FOLDER = r'./' + TPL_FOLDER
 
+SRC_FOLDER_NAME = r'src'
+
 MACROSES = [r'%%=PROJ_NAME%%', r'%%=PROJ_PATH%%']
 
 if __name__ == r'__main__':
@@ -98,10 +140,30 @@ if __name__ == r'__main__':
     # parse args
 
     parser = OptionParser(usage=r'usage: %prog [options] module1 module2')
-    parser.add_option(r'-o', r'--out', dest=r'proj', help=r'create or check project in DIRNAME', metavar=r'DIRNAME')
-    parser.add_option(r'-l', r'--list', action=r'store_true', dest=r'showlist', help=r'show modules list', default=False)
-    parser.add_option(r'-m', r'--macroses', action=r'store_true', dest=r'showmacroses', help=r'show list or macroses to replace in files', default=False)
-    parser.add_option(r'-r', r'--replace', action=r'store_true', dest=r'replace', help=r'replace macroses in copyed template files', default=False)
+    parser.add_option(r'-o', r'--out',
+                      dest=r'proj',
+                      help=r'create or check project in DIRNAME',
+                      metavar=r'DIRNAME')
+    parser.add_option(r'-l', r'--list',
+                      action=r'store_true',
+                      dest=r'showlist',
+                      help=r'show modules list',
+                      default=False)
+    parser.add_option(r'-m', r'--macroses',
+                      action=r'store_true',
+                      dest=r'showmacroses',
+                      help=r'show list or macroses to replace in files',
+                      default=False)
+    parser.add_option(r'-r', r'--replace',
+                      action=r'store_true',
+                      dest=r'replace',
+                      help=r'replace macroses in copyed template files',
+                      default=False)
+    parser.add_option(r'-s', r'--src',
+                      action=r'store_true',
+                      dest=r'move',
+                      help=r'move proj folder content to src folder',
+                      default=False)
 
     (opts, args) = parser.parse_args()
 
@@ -117,17 +179,18 @@ if __name__ == r'__main__':
     # check updates templates
 
     server_tpl_version = 0
-    for line in urlopen(SERVER_URL + TPL_VERSION_FILE):
-        server_tpl_version = int(line)
+    res = urlopen(SERVER_URL + TPL_VERSION_FILE)
+    server_tpl_version = int(chunkedDownload(TPL_VERSION_FILE, res))
 
     current_tpl_version = file_get_contents(CUR_TPL_VERSION_FILE)
-    if current_tpl_version == False or not(os.path.exists(CUR_TPL_FOLDER)):
+    if current_tpl_version is False or not(os.path.exists(CUR_TPL_FOLDER)):
         current_tpl_version = 0
     else:
         current_tpl_version = int(current_tpl_version)
 
     if server_tpl_version == 0 and not(os.path.exists(CUR_TPL_FOLDER)):
-        six.print_(r'ERROR: Current and remote versions of templates is broken. Can not restore template version!')
+        six.print_(r'ERROR: Current and remote versions of templates ' +
+                   r'is broken. Can not restore template version!')
         os._exit(1)
 
     updated = False
@@ -135,8 +198,8 @@ if __name__ == r'__main__':
         six.print_(r'Update templates ...')
         try:
             file_write_contents(CUR_TPL_VERSION_FILE, str(server_tpl_version))
-            filedata = urlopen(SERVER_URL + TPL_ARCHIVE)
-            datatowrite = filedata.read()
+            res = urlopen(SERVER_URL + TPL_ARCHIVE)
+            datatowrite = chunkedDownload(TPL_ARCHIVE, res)
             file_write_contents(CUR_TPL_ARCHIVE, datatowrite, r'bw')
             if os.path.exists(CUR_TPL_FOLDER):
                 shutil.rmtree(CUR_TPL_FOLDER)
@@ -174,13 +237,24 @@ if __name__ == r'__main__':
     if not(os.path.exists(projPath)):
         os.makedirs(projPath)
         six.print_(r'Projcet directory created !')
+    else:
+        if opts.move:
+            c = os.listdir(projPath)
+            if len(c) > 0:
+                src_folder = projPath + SRC_FOLDER_NAME
+                if not(os.path.exists(src_folder)):
+                    os.makedirs(src_folder)
+                for f in c:
+                    if not (f == SRC_FOLDER_NAME):
+                        shutil.move(projPath + f, src_folder)
 
     # collect macros
 
     macros = {}
 
     if opts.replace:
-        macros = dict(zip(MACROSES, [os.path.basename(os.path.dirname(projPath)), projPath]))
+        projName = os.path.basename(os.path.dirname(projPath))
+        macros = dict(zip(MACROSES, [projName, projPath]))
 
     # integrate modules
 
