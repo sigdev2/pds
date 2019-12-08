@@ -164,6 +164,11 @@ if __name__ == r'__main__':
                       dest=r'move',
                       help=r'move proj folder content to src folder',
                       default=False)
+    parser.add_option(r'-d', r'--disable',
+                      action=r'store_true',
+                      dest=r'disable',
+                      help=r'disable templates update',
+                      default=False)
 
     (opts, args) = parser.parse_args()
 
@@ -179,8 +184,9 @@ if __name__ == r'__main__':
     # check updates templates
 
     server_tpl_version = 0
-    res = urlopen(SERVER_URL + TPL_VERSION_FILE)
-    server_tpl_version = int(chunkedDownload(TPL_VERSION_FILE, res))
+    if not opts.disable:
+        res = urlopen(SERVER_URL + TPL_VERSION_FILE)
+        server_tpl_version = int(chunkedDownload(TPL_VERSION_FILE, res))
 
     current_tpl_version = file_get_contents(CUR_TPL_VERSION_FILE)
     if current_tpl_version is False or not(os.path.exists(CUR_TPL_FOLDER)):
