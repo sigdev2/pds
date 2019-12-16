@@ -19,8 +19,12 @@ import os
 import shutil
 import six
 import mimetypes
+import datetime
+import re
 from zipfile import ZipFile
 from optparse import OptionParser
+
+iprint = six.print_
 
 try:
     # Python 2.6-2.7
@@ -39,15 +43,30 @@ except ImportError:
 # utils
 
 
+def list_files_rec(src, stack=r'', is_end=True):
+    global iprint
+    indent = r'└── ' if is_end else r'├── '
+    if src.endswith(r'/') or src.endswith('\\'):
+        src = src[:-1]
+    iprint(stack + indent + os.path.basename(src))
+    stack += r'│   ' if not(is_end) else r'    '
+    if os.path.isdir(src):
+        chl = os.listdir(src)
+        last = len(chl) - 1
+        for contens in enumerate(chl):
+            list_files_rec(src + os.sep + contens[1],
+                           stack, contens[0] == last)
+
+
 def printProgressBar(message, total, pos,
                      decimals=1, length=100, fill=r'█', printEnd='\r'):
     value = 100 * (pos / float(total))
     percent = (r'{0:.' + str(decimals) + r'f}').format(value)
     filledLength = int(length * pos // total)
     bar = fill * filledLength + '-' * (length - filledLength)
-    six.print_('\r %s |%s| %s%%' % (message, bar, percent), end=printEnd)
+    iprint('\r %s |%s| %s%%' % (message, bar, percent), end=printEnd)
     if pos >= total:
-        six.print_()
+        iprint()
 
 
 def downloadProgress(file, bytes_red, total_size):
@@ -80,14 +99,18 @@ def is_text_file(filename):
     if not(mime_type is None):
         return mime_type.startswith(r'text')
 
-    s = open(filename).read(512)
-    text_characters = r''.join(map(chr, range(32, 127))) + '\n\r\t\b'
-    if not s:
-        return True
-    if '\0' in s:
+    try:
+        s = open(filename).read(512)
+        text_characters = r''.join(map(chr, range(32, 127))) + '\n\r\t\b'
+        if not s:
+            return True
+        if '\0' in s:
+            return False
+        t = translate(s, text_characters)
+        return float(len(t))/float(len(s)) >= 0.70
+    except BaseException:
         return False
-    t = translate(s, text_characters)
-    return float(len(t))/float(len(s)) >= 0.70
+    return True
 
 
 def file_get_contents(filename):
@@ -102,25 +125,12 @@ def file_write_contents(filename, content, mode=r'w'):
         f.write(content)
 
 
-def structToProj(src, target, macros):
-    for root, dirs, files in os.walk(src):
-        for d in dirs:
-            path = target + root.replace(src, r'') + os.sep + d
-            if not(os.path.exists(path)):
-                os.makedirs(path)
-        for f in files:
-            path = target + root.replace(src, r'') + os.sep + f
-            if not(os.path.exists(path)):
-                shutil.copyfile(root + os.sep + f, path)
-            if macros:
-                if is_text_file(path):
-                    c = file_get_contents(path)
-                    for macro in macros:
-                        c = c.replace(macro, macros[macro])
-                    file_write_contents(path, c)
+def extended_filename(ext, path):
+    name, oldext = os.path.splitext(os.path.basename(path))
+    return name + r'.' + ext + oldext
+
 
 # consts
-
 
 SERVER_URL = r'https://raw.githubusercontent.com/sigdev2/prosys/master/'
 TPL_VERSION_FILE = r'TEMPLATES_VERSION'
@@ -133,52 +143,155 @@ CUR_TPL_FOLDER = r'./' + TPL_FOLDER
 
 SRC_FOLDER_NAME = r'src'
 
-MACROSES = [r'%%=PROJ_NAME%%', r'%%=PROJ_PATH%%']
+LICENSE_LIST = [r'0BSD', r'AFLv3', r'AGPLv3', r'APACHEv2', r'ARTISTICv2',
+                r'BSDv2', r'BSDv3', r'BSDv3C', r'BSDv4', r'BSL', r'CC0',
+                r'CCv4', r'CCbySAv4', r'CECILLv2-1', r'ECLv2', r'EPL',
+                r'EPLv2', r'EUPLv1-1', r'EUPLv1-2', r'GPLv2', r'GPLv3',
+                r'ISC', r'LGPLv2-1', r'LGPLv3', r'LPPLv1-3', r'MIT',
+                r'MPLv2', r'MSPL', r'MSRL', r'NCSA', r'ODBL', r'OFLv1-1',
+                r'OSLv3', r'POSTGRESQL', r'UNLICENSE', r'UPL', r'WTFPLv2',
+                r'ZLIB']
+
+RE_IS_LOCALE = re.compile(r'^[A-z]{2}[-_][A-z]{2}$')
+RE_IS_VERSION = re.compile(
+    r'^\d+[-\._]\d+[-\._]\d+' +
+    r'([-\._](a|alpha|b|beta|rc|r|d|debug|release|t|test)([-\._]\d+)?)?$')
+RE_IS_LICENSE = re.compile(r'^(' + r'|'.join(LICENSE_LIST) + r')$')
+RE_IS_EMAIL = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+
+MACROSES = {
+    r'%%=PROJ_NAME%%': lambda path, projPath, tags:
+        os.path.basename(os.path.dirname(projPath)),
+    r'%%=PROJ_PATH%%': lambda path, projPath, tags: projPath,
+    r'%%=CUR_DATE%%': lambda path, projPath, tags:
+        datetime.datetime.now().strftime(r'%Y.%m.%d'),
+    r'%%=CUR_YEAR%%': lambda path, projPath, tags:
+        datetime.datetime.now().strftime(r'%Y'),
+    r'%%=CUR_TIME%%': lambda path, projPath, tags:
+        datetime.datetime.now().strftime(r'%H:%M'),
+    r'%%=DATE_AS_NUMBER%%': lambda path, projPath, tags:
+        datetime.datetime.now().strftime(r'%Y%m%d'),
+    r'%%=VERSION%%': lambda path, projPath, tags:
+        ([t for t in tags if RE_IS_VERSION.match(t)] + [r'0.1.0-a1'])[0],
+    r'%%=LINKS_TO_LOCALIZED%%': lambda path, projPath, tags:
+        r' '.join([r'[%s](%s)' % (x, extended_filename(x, path))
+                 for x in [t for t in tags if RE_IS_LOCALE.match(t)]]),
+    r'%%=LICENSE%%': lambda path, projPath, tags:
+        ([t for t in tags if RE_IS_LICENSE.match(t)] + [r'UNLICENSE'])[0],
+    r'%%=LINK_TO_LICENSE%%': lambda path, projPath, tags:
+        r' '.join([r'[%s](%s)' % (x, extended_filename(x, path))
+                  for x in [t for t in tags if RE_IS_LICENSE.match(t)]]),
+    r'%%=EMAIL%%': lambda path, projPath, tags:
+        ([t for t in tags if RE_IS_EMAIL.match(t)] + [r'[email]'])[0]}
+
+
+# functions
+
+def structToProjRec(src, target, root, tags, replace):
+    global MACROSES
+    for contens in os.listdir(src):
+        if contens.startswith(r'@'):
+            find = False
+            for t in tags:
+                if contens.endswith(r'.' + t) or (r'.' + t + r'.') in contens:
+                    find = True
+                    break
+            if find is False:
+                continue
+        full = src + os.sep + contens
+        path = target
+        path += os.sep + (contens[1:] if contens.startswith(r'@') else contens)
+        if os.path.isdir(full):
+            if not(os.path.exists(path)):
+                os.makedirs(path)
+            structToProjRec(full, path, root, tags, replace)
+        else:
+            if not(os.path.exists(path)):
+                shutil.copyfile(full, path)
+                if replace and is_text_file(path):
+                    c = file_get_contents(path)
+                    for macro in MACROSES:
+                        c = c.replace(macro,
+                                      MACROSES[macro](path, root, tags))
+                    file_write_contents(path, c)
+
 
 if __name__ == r'__main__':
 
     # parse args
 
-    parser = OptionParser(usage=r'usage: %prog [options] module1 module2')
+    usage = r'usage: %prog [options] module1 module2 tag1 tag2'
+    parser = OptionParser(usage=usage,
+                          version='%prog 0.1')
     parser.add_option(r'-o', r'--out',
                       dest=r'proj',
                       help=r'create or check project in DIRNAME',
                       metavar=r'DIRNAME')
+    parser.add_option(r'-s', r'--src',
+                      action=r'store_true',
+                      dest=r'move',
+                      help=r'move proj folder content to src folder',
+                      default=False)
     parser.add_option(r'-l', r'--list',
                       action=r'store_true',
                       dest=r'showlist',
-                      help=r'show modules list',
-                      default=False)
+                      help=r'show modules list')
     parser.add_option(r'-m', r'--macroses',
                       action=r'store_true',
                       dest=r'showmacroses',
                       help=r'show list or macroses to replace in files',
                       default=False)
-    parser.add_option(r'-r', r'--replace',
+    parser.add_option(r'-i', r'--license',
                       action=r'store_true',
-                      dest=r'replace',
-                      help=r'replace macroses in copyed template files',
+                      dest=r'showlicense',
+                      help=r'show list of available licenses',
                       default=False)
-    parser.add_option(r'-s', r'--src',
+    parser.add_option(r'-R', r'--no_replace',
                       action=r'store_true',
-                      dest=r'move',
-                      help=r'move proj folder content to src folder',
+                      dest=r'no_replace',
+                      help=r'replace macroses in copyed template files',
                       default=False)
     parser.add_option(r'-d', r'--disable',
                       action=r'store_true',
                       dest=r'disable',
                       help=r'disable templates update',
                       default=False)
+    parser.add_option(r'-n', r'--no_results',
+                      action=r'store_true',
+                      dest=r'no_results',
+                      help=r'do not show results',
+                      default=False)
+    parser.add_option(r'-q', r'--quiet',
+                      action=r'store_true',
+                      dest=r'quiet',
+                      help=r'silent mode',
+                      default=False)
 
     (opts, args) = parser.parse_args()
+
+    if opts.quiet:
+        def tmp_print(x=r'', end=r''):
+            return False
+        iprint = tmp_print
+
+    iprint(r'')
+
+    # list of licenses
+
+    if opts.showlicense:
+        iprint('List of available licenses: \n')
+        for l in LICENSE_LIST:
+            iprint(l)
+        iprint('\n')
+        os._exit(1)
 
     # list of macroses
 
     if opts.showmacroses:
-        six.print_('\nList of macroses to replace in templates: \n')
+        iprint('List of macroses to replace in templates: \n')
         for m in MACROSES:
-            six.print_(m)
-        six.print_('\n')
+            iprint(m)
+        iprint('\n')
         os._exit(1)
 
     # check updates templates
@@ -195,13 +308,13 @@ if __name__ == r'__main__':
         current_tpl_version = int(current_tpl_version)
 
     if server_tpl_version == 0 and not(os.path.exists(CUR_TPL_FOLDER)):
-        six.print_(r'ERROR: Current and remote versions of templates ' +
+        iprint(r'ERROR: Current and remote versions of templates ' +
                    r'is broken. Can not restore template version!')
         os._exit(1)
 
     updated = False
     if server_tpl_version > current_tpl_version:
-        six.print_(r'Update templates ...')
+        iprint(r'Update templates ...')
         try:
             file_write_contents(CUR_TPL_VERSION_FILE, str(server_tpl_version))
             res = urlopen(SERVER_URL + TPL_ARCHIVE)
@@ -211,30 +324,34 @@ if __name__ == r'__main__':
                 shutil.rmtree(CUR_TPL_FOLDER)
             with ZipFile(CUR_TPL_ARCHIVE, r'r') as zipObj:
                 zipObj.extractall()
-            six.print_(r'Templates update successfully!')
+            iprint(r'Templates update successfully!')
             updated = True
-        except Exception:
-            six.print_(r'ERROR: Can not update templates! Try skip update ...')
+        except BaseException:
+            iprint(r'ERROR: Can not update templates! Try skip update ...')
             if not(os.path.exists(CUR_TPL_FOLDER)):
-                six.print_(r'ERROR: Templates is not exists!')
+                iprint(r'ERROR: Templates is not exists!')
                 os._exit(1)
 
     # list of templates
 
+    templatesList = os.listdir(CUR_TPL_FOLDER)
+
     if opts.showlist or updated:
-        six.print_('\nList of available templates: \n')
-        six.print_('    Name:\tVersion:\n')
-        for dirname in os.listdir(CUR_TPL_FOLDER):
-            six.print_(r'    ' + dirname.replace(r'_ver=', '\t'))
-        six.print_('\n')
+        iprint('List of available templates: \n')
+        iprint('    Name:\tVersion:\n')
+        for dirname in templatesList:
+            iprint(r'    ' + dirname.replace(r'_ver=', '\t'))
+        iprint('\n')
         if opts.showlist:
             os._exit(1)
 
     # applay proj path
 
     if not opts.proj:
-        six.print_(r'ERROR: Specify the path to the project!')
+        iprint(r'ERROR: Specify the path to the project!')
         os._exit(1)
+
+    iprint('\nStart working ... \n')
 
     projPath = os.path.abspath(opts.proj)
     if not(projPath[-1] == os.sep):
@@ -242,7 +359,7 @@ if __name__ == r'__main__':
 
     if not(os.path.exists(projPath)):
         os.makedirs(projPath)
-        six.print_(r'Projcet directory created !')
+        iprint(r'Projcet directory created !\n')
     else:
         if opts.move:
             c = os.listdir(projPath)
@@ -254,21 +371,31 @@ if __name__ == r'__main__':
                     if not (f == SRC_FOLDER_NAME):
                         shutil.move(projPath + f, src_folder)
 
-    # collect macros
+    # parse args
 
-    macros = {}
+    tags = set()
+    templates = set()
 
-    if opts.replace:
-        projName = os.path.basename(os.path.dirname(projPath))
-        macros = dict(zip(MACROSES, [projName, projPath]))
+    templatesNames = [x.split(r'_ver=')[0] for x in templatesList]
+
+    for name in args:
+        if name in templatesNames:
+            templates.add(templatesNames.index(name))
+        else:
+            tags.add(name)
 
     # integrate modules
 
-    for dirname in os.listdir(CUR_TPL_FOLDER):
-        name = dirname.split(r'_ver=')[0]
-        if name in args:
-            six.print_(r'use ' + name)
-            structToProj(CUR_TPL_FOLDER + dirname, projPath, macros)
+    for i in templates:
+        iprint(r'use ' + templatesNames[i])
+        structToProjRec(CUR_TPL_FOLDER + templatesList[i], projPath,
+                        projPath, list(tags), not(opts.no_replace))
+
+    # display result
+
+    if opts.no_results is False:
+        iprint('\nResult:\n')
+        list_files_rec(projPath)
 
     # success
-    six.print_(r'Success!')
+    iprint('\nSuccess!')
