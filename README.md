@@ -15,7 +15,7 @@ Project Deployment System
       -l, --list            show modules list
       -m, --macroses        show list or macroses to replace in files
       -i, --license         show list of available licenses
-      -r, --replace         replace macroses in copyed template files
+      -R, --no_replace      replace macroses in copyed template files
       -d, --disable         disable templates update
       -n, --no_results      do not show results
       -q, --quiet           silent mode
