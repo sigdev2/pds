@@ -1,5 +1,8 @@
-# prosys
+# Prosys
+
 Project Deployment System
+
+## Command line interface
 
     Usage: prosys.py [options] module1 module2 tag1 tag2
     
@@ -16,3 +19,11 @@ Project Deployment System
       -d, --disable         disable templates update
       -n, --no_results      do not show results
       -q, --quiet           silent mode
+
+## Usage
+
+You can read more about usage on the [Wiki](https://github.com/sigdev2/prosys/wiki).
+
+## License
+
+[Apache2](https://choosealicense.com/licenses/apache-2.0/)
