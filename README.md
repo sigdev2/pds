@@ -4,7 +4,7 @@ Project Deployment System
 
 ## Command line interface
 
-    Usage: prosys.py [options] module1 module2 tag1 tag2
+    Usage: prosys [options] module1 module2 tag1 tag2
     
     Options:
       --version             show program's version number and exit
