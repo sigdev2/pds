@@ -1,0 +1,131 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Base run",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "List of templates",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-l"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "List of licenses",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-i"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test disable update",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-d", "-o", "test/proj", "base", "doxygen"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "List of macroses",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-m"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test move sources",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-s", "-o", "test/proj"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Show version",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-v"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test silent mode",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-q", "-o", "test/proj"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test disable results out",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-n", "-o", "test/proj", "base", "doxygen", "license", "GPLv3", "cpptools", "win32"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Show help",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-h"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test do not replace macroses",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-o", "-R", "test/proj", "base", "doxygen"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test project",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-o", "test/proj", "base", "doxygen"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test license",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-o", "test/proj", "base", "doxygen", "license", "GPLv3", "cpptools", "win32"],
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Test all",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["-o", "test/proj", "base", "cpptools", "win32", "ru_RU", "doxygen", "issues",
+                     "licenses", "MIT", "con@mail.ru", "opensource", "pages", "setup", "tests", "version", "wiki"],
+            "console": "integratedTerminal"
+        }
+    ]
+}
