@@ -59,7 +59,7 @@ def list_files_rec(src, stack=r'', is_end=True):
 
 
 def printProgressBar(message, total, pos,
-                     decimals=1, length=100, fill=r'█', printEnd='\r'):
+                     decimals=1, length=50, fill=r'█', printEnd='\r'):
     value = 100 * (pos / float(total))
     percent = (r'{0:.' + str(decimals) + r'f}').format(value)
     filledLength = int(length * pos // total)
