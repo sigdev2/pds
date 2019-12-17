@@ -22,6 +22,10 @@ Project Deployment System
 
 ## Usage
 
+Example:
+
+    prosys -o test/proj base cpptools win32 ru_RU doxygen issues licenses MIT test@test.ru opensource pages setup tests version wiki
+
 You can read more about usage on the [Wiki](https://github.com/sigdev2/prosys/wiki).
 
 ## License
