@@ -175,7 +175,7 @@ MACROSES = {
         ([t for t in tags if RE_IS_VERSION.match(t)] + [r'0.1.0-a1'])[0],
     r'%%=LINKS_TO_LOCALIZED%%': lambda path, projPath, tags:
         r' '.join([r'[%s](%s)' % (x, extended_filename(x, path))
-                 for x in [t for t in tags if RE_IS_LOCALE.match(t)]]),
+                  for x in [t for t in tags if RE_IS_LOCALE.match(t)]]),
     r'%%=LICENSE%%': lambda path, projPath, tags:
         ([t for t in tags if RE_IS_LICENSE.match(t)] + [r'UNLICENSE'])[0],
     r'%%=LINK_TO_LICENSE%%': lambda path, projPath, tags:
