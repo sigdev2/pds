@@ -162,6 +162,14 @@ RE_IS_EMAIL = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 MACROSES = {
     r'%%=PROJ_NAME%%': lambda path, projPath, tags:
         os.path.basename(os.path.dirname(projPath)),
+    r'%%=AUTHOR%%': lambda path, projPath, tags:
+        ([t[1:] for t in tags if t.startswith(r'@')] +
+         [os.path.basename(os.path.dirname(projPath))])[0],
+    r'%%=KEYWORDS%%': lambda path, projPath, tags:
+        r', '.join([t for t in tags if t.startswith(r'#')]),
+    r'%%=DESCRIPTION%%': lambda path, projPath, tags:
+        r''.join([t[2:-2] for t in tags
+                  if t.startswith(r'**') and t.endswith(r'**')]),
     r'%%=PROJ_PATH%%': lambda path, projPath, tags: projPath,
     r'%%=CUR_DATE%%': lambda path, projPath, tags:
         datetime.datetime.now().strftime(r'%Y.%m.%d'),
