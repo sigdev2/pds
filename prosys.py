@@ -199,8 +199,14 @@ def structToProjRec(src, target, root, tags, replace):
             if find is False:
                 continue
         full = src + os.sep + contens
-        path = target
-        path += os.sep + (contens[1:] if contens.startswith(r'@') else contens)
+        path = target + os.sep
+        rn = (contens[1:] if contens.startswith(r'@') else contens)
+        for macro in MACROSES:
+            rn = rn.replace(macro,
+                            MACROSES[macro](path + rn,
+                                            root,
+                                            tags))
+        path += rn
         if os.path.isdir(full):
             if not(os.path.exists(path)):
                 os.makedirs(path)
