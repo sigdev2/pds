@@ -1,3 +1,10 @@
+2020-01-08 SigDev <https://github.com/sigdev2>
+
+    * Add macroses in templates files and folders names!
+    * Add macroses: AUTHOR, KEYWORDS, DESCRIPTION, TAGS, MODULES
+    * Update templates, add modules: prosys, pyinstaller, pypackage
+    * Version 0.2 released
+
 2019-12-07 SigDev <https://github.com/sigdev2>
 
     * Core version 0.1 released

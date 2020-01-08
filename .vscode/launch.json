@@ -123,8 +123,8 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "args": ["-o", "test/proj", "base", "cpptools", "win32", "ru_RU", "doxygen", "issues",
-                     "@SigDev", "#tag1", "#tag2", "**Description text text**",
+            "args": ["-o", "test/proj", "base", "cpptools", "win32", "ru_RU", "doxygen", "issues", "pypackage",
+                     "@SigDev", "#tag1", "#tag2", "**Description text text**", "@autor", "prosys", "pyinstaller",
                      "licenses", "MIT", "con@mail.ru", "opensource", "pages", "setup", "tests", "version", "wiki"],
             "console": "integratedTerminal"
         }

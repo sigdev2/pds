@@ -160,42 +160,47 @@ RE_IS_LICENSE = re.compile(r'^(' + r'|'.join(LICENSE_LIST) + r')$')
 RE_IS_EMAIL = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
 MACROSES = {
-    r'%%=PROJ_NAME%%': lambda path, projPath, tags:
+    r'%%=PROJ_NAME%%': lambda path, projPath, tags, tpls:
         os.path.basename(os.path.dirname(projPath)),
-    r'%%=AUTHOR%%': lambda path, projPath, tags:
+    r'%%=AUTHOR%%': lambda path, projPath, tags, tpls:
         ([t[1:] for t in tags if t.startswith(r'@')] +
          [os.path.basename(os.path.dirname(projPath))])[0],
-    r'%%=KEYWORDS%%': lambda path, projPath, tags:
-        r', '.join([t for t in tags if t.startswith(r'#')]),
-    r'%%=DESCRIPTION%%': lambda path, projPath, tags:
+    r'%%=KEYWORDS%%': lambda path, projPath, tags, tpls:
+        r' '.join([t for t in tags if t.startswith(r'#')]),
+    r'%%=DESCRIPTION%%': lambda path, projPath, tags, tpls:
         r''.join([t[2:-2] for t in tags
                   if t.startswith(r'**') and t.endswith(r'**')]),
-    r'%%=PROJ_PATH%%': lambda path, projPath, tags: projPath,
-    r'%%=CUR_DATE%%': lambda path, projPath, tags:
+    r'%%=PROJ_PATH%%': lambda path, projPath, tags, tpls: projPath,
+    r'%%=CUR_DATE%%': lambda path, projPath, tags, tpls:
         datetime.datetime.now().strftime(r'%Y.%m.%d'),
-    r'%%=CUR_YEAR%%': lambda path, projPath, tags:
+    r'%%=CUR_YEAR%%': lambda path, projPath, tags, tpls:
         datetime.datetime.now().strftime(r'%Y'),
-    r'%%=CUR_TIME%%': lambda path, projPath, tags:
+    r'%%=CUR_TIME%%': lambda path, projPath, tags, tpls:
         datetime.datetime.now().strftime(r'%H:%M'),
-    r'%%=DATE_AS_NUMBER%%': lambda path, projPath, tags:
+    r'%%=DATE_AS_NUMBER%%': lambda path, projPath, tags, tpls:
         datetime.datetime.now().strftime(r'%Y%m%d'),
-    r'%%=VERSION%%': lambda path, projPath, tags:
+    r'%%=VERSION%%': lambda path, projPath, tags, tpls:
         ([t for t in tags if RE_IS_VERSION.match(t)] + [r'0.1.0-a1'])[0],
-    r'%%=LINKS_TO_LOCALIZED%%': lambda path, projPath, tags:
+    r'%%=LINKS_TO_LOCALIZED%%': lambda path, projPath, tags, tpls:
         r' '.join([r'[%s](%s)' % (x, extended_filename(x, path))
                   for x in [t for t in tags if RE_IS_LOCALE.match(t)]]),
-    r'%%=LICENSE%%': lambda path, projPath, tags:
+    r'%%=LICENSE%%': lambda path, projPath, tags, tpls:
         ([t for t in tags if RE_IS_LICENSE.match(t)] + [r'UNLICENSE'])[0],
-    r'%%=LINK_TO_LICENSE%%': lambda path, projPath, tags:
+    r'%%=LINK_TO_LICENSE%%': lambda path, projPath, tags, tpls:
         r' '.join([r'[%s](%s)' % (x, extended_filename(x, path))
                   for x in [t for t in tags if RE_IS_LICENSE.match(t)]]),
-    r'%%=EMAIL%%': lambda path, projPath, tags:
-        ([t for t in tags if RE_IS_EMAIL.match(t)] + [r'[email]'])[0]}
+    r'%%=EMAIL%%': lambda path, projPath, tags, tpls:
+        ([t for t in tags if RE_IS_EMAIL.match(t)] + [r'[email]'])[0],
+    r'%%=TAGS%%': lambda path, projPath, tags, tpls:
+        r'"' + r'" "'.join(tags) + r'"',
+    r'%%=MODULES%%': lambda path, projPath, tags, tpls:
+        r'"' + r'" "'.join(tpls) + r'"',
+    }
 
 
 # functions
 
-def structToProjRec(src, target, root, tags, replace):
+def structToProjRec(src, target, root, tags, tpls, replace):
     global MACROSES
     for contens in os.listdir(src):
         if contens.startswith(r'@'):
@@ -213,12 +218,13 @@ def structToProjRec(src, target, root, tags, replace):
             rn = rn.replace(macro,
                             MACROSES[macro](path + rn,
                                             root,
-                                            tags))
+                                            tags,
+                                            tpls))
         path += rn
         if os.path.isdir(full):
             if not(os.path.exists(path)):
                 os.makedirs(path)
-            structToProjRec(full, path, root, tags, replace)
+            structToProjRec(full, path, root, tags, tpls, replace)
         else:
             if not(os.path.exists(path)):
                 shutil.copyfile(full, path)
@@ -226,7 +232,7 @@ def structToProjRec(src, target, root, tags, replace):
                     c = file_get_contents(path)
                     for macro in MACROSES:
                         c = c.replace(macro,
-                                      MACROSES[macro](path, root, tags))
+                                      MACROSES[macro](path, root, tags, tpls))
                     file_write_contents(path, c)
 
 
@@ -323,7 +329,7 @@ if __name__ == r'__main__':
 
     if server_tpl_version == 0 and not(os.path.exists(CUR_TPL_FOLDER)):
         iprint(r'ERROR: Current and remote versions of templates ' +
-                   r'is broken. Can not restore template version!')
+               r'is broken. Can not restore template version!')
         os._exit(1)
 
     updated = False
@@ -391,10 +397,12 @@ if __name__ == r'__main__':
     templates = set()
 
     templatesNames = [x.split(r'_ver=')[0] for x in templatesList]
+    choosedTemplates = set()
 
     for name in args:
         if name in templatesNames:
             templates.add(templatesNames.index(name))
+            choosedTemplates.add(name)
         else:
             tags.add(name)
 
@@ -403,7 +411,8 @@ if __name__ == r'__main__':
     for i in templates:
         iprint(r'use ' + templatesNames[i])
         structToProjRec(CUR_TPL_FOLDER + templatesList[i], projPath,
-                        projPath, list(tags), not(opts.no_replace))
+                        projPath, list(tags), list(choosedTemplates),
+                        not(opts.no_replace))
 
     # display result
 
