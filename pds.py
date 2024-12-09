@@ -132,7 +132,7 @@ def extended_filename(ext, path):
 
 # consts
 
-SERVER_URL = r'https://raw.githubusercontent.com/sigdev2/prosys/master/'
+SERVER_URL = r'https://raw.githubusercontent.com/sigdev2/pds/master/'
 TPL_VERSION_FILE = r'TEMPLATES_VERSION'
 TPL_ARCHIVE = r'templates.zip'
 TPL_FOLDER = r'templates/'
