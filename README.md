@@ -4,7 +4,7 @@ Project Deployment System
 
 ## Command line interface
 
-    Usage: prosys [options] module1 module2 tag1 tag2
+    Usage: pds [options] module1 module2 tag1 tag2
     
     Options:
       --version             show program's version number and exit
@@ -24,9 +24,9 @@ Project Deployment System
 
 Example:
 
-    prosys -o test/proj base cpptools win32 ru_RU doxygen issues licenses MIT test@test.ru opensource pages setup tests version wiki
+    pds -o test/proj base cpptools win32 ru_RU doxygen issues licenses MIT test@test.ru opensource pages setup tests version wiki
 
-You can read more about usage in the project [Wiki](https://github.com/sigdev2/prosys/wiki).
+You can read more about usage in the project [Wiki](https://github.com/sigdev2/pds/wiki).
 
 ## License
 
