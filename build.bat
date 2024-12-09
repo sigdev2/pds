@@ -1,1 +1,1 @@
-pyinstaller --onefile prosys.py
+pyinstaller --onefile pds.py
